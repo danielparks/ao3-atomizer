@@ -19,10 +19,27 @@ def handle_index(path)
     xml.feed(:xmlns => "http://www.w3.org/2005/Atom") do
       xml.title title
       xml.author { xml.name author }
+      xml.id generate_iri(path)
       xml.link rel: "alternate", type: "text/html", href: uri
 
-      html.css("ol[role=navigation] > li").each do |chapter|
-        process_chapter uri, xml, chapter
+      updated = DateTime.new(year=0)
+      chapters = html.css("ol[role=navigation] > li").map do |chapter|
+        obj = process_chapter uri, xml, chapter
+        if updated < obj[:date]
+          updated = obj[:date]
+        end
+        obj
+      end
+
+      xml.updated updated.xmlschema(0)
+
+      chapters.each do |chapter|
+        xml.entry do
+          xml.title chapter[:title]
+          xml.id chapter[:id]
+          xml.link **chapter[:link]
+          xml.published chapter[:date].xmlschema(0)
+        end
       end
     end
 
@@ -35,14 +52,12 @@ def process_chapter(uri, xml, chapter)
   a = chapter.at_css("> a")
   chapter_uri = uri.merge(a[:href]).to_s
 
-  title = a.content.split(" ", 2)[1]
-  date =  DateTime.parse(chapter.at_css("> span.datetime").content.delete "()")
-
-  xml.entry do
-    xml.title title
-    xml.published date.xmlschema(0)
-    xml.link rel: "alternate", type: "text/html", href: chapter_uri
-  end
+  {
+    title: a.content.split(" ", 2)[1],
+    id: generate_iri(a[:href]),
+    link: { rel: "alternate", type: "text/html", href: chapter_uri },
+    date: DateTime.parse(chapter.at_css("> span.datetime").content.delete "()"),
+  }
 end
 
 def normalize_argument(arg)
@@ -53,6 +68,12 @@ def normalize_argument(arg)
     uri.scheme = "file"
   end
   uri
+end
+
+def generate_iri(uri)
+  ### FIXME: this needs to be a valid IRI (RFC-3987), which allows different
+  ### characters than a URI. Also, hard coding a domain smells.
+  "https://atomizer.demon.horse/archiveofourown.org#{uri}"
 end
 
 
