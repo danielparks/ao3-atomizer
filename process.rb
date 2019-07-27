@@ -9,7 +9,8 @@ require 'uri'
 def handle_index(path)
   uri = normalize_argument(path)
 
-  open(path) do |source|
+  entire_work_path = path + "/?view_full_work=true"
+  open(entire_work_path) do |source|
     html = Nokogiri::HTML.parse(source)
 
     title = html.at_css("#workskin h2.heading").content
@@ -19,20 +20,17 @@ def handle_index(path)
     xml.feed(:xmlns => "http://www.w3.org/2005/Atom") do
       xml.title title
       xml.author { xml.name author }
-      xml.id generate_iri(path)
+      xml.id generate_iri(entire_work_path)
 
       ### FIXME should this link to the entire work?
       xml.link rel: "alternate", type: "text/html", href: uri
 
       updated = DateTime.new(year=0)
       chapters = html.css("#chapters > .chapter").map do |chapter|
-        obj = process_chapter uri, xml, chapter
-        if updated < obj[:date]
-          updated = obj[:date]
-        end
-        obj
+        process_chapter uri, xml, chapter
       end
 
+      updated = update_dates(path, chapters)
       xml.updated updated.xmlschema(0)
 
       chapters.each do |chapter|
@@ -62,9 +60,8 @@ def process_chapter(uri, xml, chapter)
     title: title,
     id: generate_iri(a_node[:href]),
     link: { rel: "alternate", type: "text/html", href: chapter_uri },
-    ### FIXME date isn’t available in entire work view
+    # date isn’t available in entire work view, so leave it empty.
     date: DateTime.new(year=0, month=1, day=1),
-    # date: DateTime.parse(chapter.at_css("> span.datetime").content.delete "()"),
   }
 end
 
@@ -82,6 +79,27 @@ def generate_iri(uri)
   ### FIXME: this needs to be a valid IRI (RFC-3987), which allows different
   ### characters than a URI. Also, hard coding a domain smells.
   "https://atomizer.demon.horse/archiveofourown.org#{uri}"
+end
+
+def update_dates(path, chapters)
+  open(path + "/navigate") do |source|
+    work_updated = DateTime.new(year=0)
+    i = 0
+
+    html = Nokogiri::HTML.parse(source)
+    html.css("ol[role=navigation] > li > span.datetime").map do |date_node|
+      date = DateTime.parse(date_node.content.delete("()"))
+      chapters[i][:date] = date
+
+      if work_updated < date
+        work_updated = date
+      end
+
+      i += 1
+    end
+  end
+
+  work_updated
 end
 
 
