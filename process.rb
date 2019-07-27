@@ -12,18 +12,20 @@ def handle_index(path)
   open(path) do |source|
     html = Nokogiri::HTML.parse(source)
 
-    title = html.at_css("#main h2.heading > a").content
-    author = html.at_css("a[rel=author]").content
+    title = html.at_css("#workskin h2.heading").content
+    author = html.at_css("#workskin a[rel=author]").content
 
     xml = Nokogiri::XML::Builder.new(:encoding => 'UTF-8')
     xml.feed(:xmlns => "http://www.w3.org/2005/Atom") do
       xml.title title
       xml.author { xml.name author }
       xml.id generate_iri(path)
+
+      ### FIXME should this link to the entire work?
       xml.link rel: "alternate", type: "text/html", href: uri
 
       updated = DateTime.new(year=0)
-      chapters = html.css("ol[role=navigation] > li").map do |chapter|
+      chapters = html.css("#chapters > .chapter").map do |chapter|
         obj = process_chapter uri, xml, chapter
         if updated < obj[:date]
           updated = obj[:date]
@@ -48,15 +50,21 @@ def handle_index(path)
 end
 
 def process_chapter(uri, xml, chapter)
+  title_node = chapter.at_css("> div[role=complementary] > h3.title")
+  a_node = title_node.at_css("> a")
+
+  title = title_node.content.split(": ", 2)[1].strip
+
   # note: URI("file:///foo/bar").merge("/baz").to_s == "file:///baz"
-  a = chapter.at_css("> a")
-  chapter_uri = uri.merge(a[:href]).to_s
+  chapter_uri = uri.merge(a_node[:href]).to_s
 
   {
-    title: a.content.split(" ", 2)[1],
-    id: generate_iri(a[:href]),
+    title: title,
+    id: generate_iri(a_node[:href]),
     link: { rel: "alternate", type: "text/html", href: chapter_uri },
-    date: DateTime.parse(chapter.at_css("> span.datetime").content.delete "()"),
+    ### FIXME date isn’t available in entire work view
+    date: DateTime.new(year=0, month=1, day=1),
+    # date: DateTime.parse(chapter.at_css("> span.datetime").content.delete "()"),
   }
 end
 
