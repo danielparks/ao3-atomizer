@@ -14,8 +14,13 @@ def handle_index(path)
   open(entire_work_path) do |source|
     html = Nokogiri::HTML.parse(source)
 
-    title = html.at_css("#workskin h2.heading").content.strip
-    author = html.at_css("#workskin a[rel=author]").content.strip
+    title_node = html.at_css("#workskin h2.heading")
+    raise "could not find work title" if title_node == nil
+    title = title_node.content.strip
+
+    author_node = html.at_css("#workskin a[rel=author]")
+    raise "could not find work author" if author_node == nil
+    author = author_node.content.strip
 
     xml = Nokogiri::XML::Builder.new(:encoding => 'UTF-8')
     xml.feed(:xmlns => "http://www.w3.org/2005/Atom") do
@@ -53,8 +58,13 @@ def process_chapter(uri, xml, chapter)
   title_node = chapter.at_css("> div[role=complementary] > h3.title")
   a_node = title_node.at_css("> a")
 
-  title = title_node.content.split(": ", 2)[1].strip
+  raise "could not find chapter title node" if title_node == nil
+  raise "could not find link in chapter title node" if a_node == nil
+
+  title = title_node.content.split(": ", 2).last.strip
   content = chapter.at_css("div[role=article]")
+
+  raise "could not find chapter content" if content == nil
 
   # Strip landmark nodes that are supposed to be hidden.
   content.css(".landmark").each do |node|
