@@ -5,6 +5,8 @@ require 'nokogiri'
 require 'open-uri'
 require 'uri'
 
+LIMIT=10
+
 # Called on each element of ARGV
 def handle_index(path)
   uri = normalize_argument(path)
@@ -30,7 +32,8 @@ def handle_index(path)
       xml.link rel: "self", type: "application/atom+xml", href: atom_uri
       xml.link rel: "alternate", type: "text/html", href: uri
 
-      chapters = html.css("#chapters > .chapter").map do |chapter|
+      chapters = html.css("#chapters > .chapter").reverse.first(LIMIT)
+      chapters.map! do |chapter|
         process_chapter uri, xml, chapter
       end
 
@@ -108,12 +111,15 @@ def update_dates(path, chapters)
 
   open(path + "/navigate") do |source|
     html = Nokogiri::HTML.parse(source)
-    html.css("ol[role=navigation] > li > span.datetime").map do |date_node|
-      date = DateTime.parse(date_node.content.delete("()"))
-      chapters[i][:date] = date
+    dates = html.css("ol[role=navigation] > li > span.datetime")
+    dates.reverse.first(LIMIT).map do |date_node|
+      if chapters[i] != nil
+        date = DateTime.parse(date_node.content.delete("()"))
+        chapters[i][:date] = date
 
-      if work_updated < date
-        work_updated = date
+        if work_updated < date
+          work_updated = date
+        end
       end
 
       i += 1
