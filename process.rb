@@ -9,7 +9,7 @@ require 'uri'
 def handle_index(path)
   uri = normalize_argument(path)
   atom_uri = "https://atomizer.demon.horse/archiveofourown.org#{uri.path}.atom"
-  entire_work_path = path + "/?view_full_work=true"
+  entire_work_path = path + "/?view_adult=true&view_full_work=true"
 
   open(entire_work_path) do |source|
     html = Nokogiri::HTML.parse(source)
