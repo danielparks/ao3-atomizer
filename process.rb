@@ -43,6 +43,7 @@ def handle_index(path)
           xml.id chapter[:id]
           xml.link **chapter[:link]
           xml.published chapter[:date].xmlschema(0)
+          xml.updated chapter[:date].xmlschema(0)
           xml.content type: "html" do
             xml.cdata chapter[:content]
           end
